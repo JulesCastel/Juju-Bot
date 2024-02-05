@@ -20,6 +20,8 @@ import botfuncs
 i started with code for this from Indently's tutorial on creating a Discord bot with Python: https://www.youtube.com/watch?v=UYJDKSah-Ww
 """
 
+COMMAND_PREFIX: Final[str] = "juju " #change this to whatever you want
+
 # load token from the .env
 load_dotenv()
 TOKEN: Final[str] = os.getenv("DISCORD_TOKEN")
@@ -27,7 +29,7 @@ TOKEN: Final[str] = os.getenv("DISCORD_TOKEN")
 # bot setup
 intents: Intents = Intents.default()
 intents.message_content = True
-bot: commands.Bot = commands.Bot(command_prefix="juul ", intents=intents)
+bot: commands.Bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 
 # startup
