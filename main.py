@@ -1,5 +1,6 @@
 from typing import Final
 import os
+import re
 from dotenv import load_dotenv
 import asyncio
 import nest_asyncio
@@ -25,6 +26,8 @@ COMMAND_PREFIX: Final[str] = "juju " #change this to whatever you want
 # load token from the .env
 load_dotenv()
 TOKEN: Final[str] = os.getenv("DISCORD_TOKEN")
+TENOR_KEY: Final[str] = os.getenv("TENOR_KEY")
+
 
 # bot setup
 intents: Intents = Intents.default()
@@ -59,6 +62,23 @@ async def on_message(message: Message) -> None:
 
     print(f'[{server}: #{channel}] {username}: "{user_message}"')
     await bot.process_commands(message)
+    
+# for if someone sends something that isn't a command
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        fake_command = ctx.message.content[5:]
+        if re.search(r"\s", fake_command):
+            fake_command = fake_command.strip().replace(" ", "+")
+        if user_mentioned := re.search(r"<@\d+>", ctx.message.content):
+            user_mention = user_mentioned.group(0)
+            fake_command = fake_command.replace(f"+{user_mention}", "")
+            print(f"{ctx.author} attempted command \"{fake_command}\" which does not exist. sending gif instead")
+            await ctx.send(user_mention)
+            await ctx.send(botfuncs.cnf_gif(fake_command, TENOR_KEY))
+        else:
+            print(f"{ctx.author} attempted command \"{fake_command}\" which does not exist. sending gif instead")
+            await ctx.reply(botfuncs.cnf_gif(fake_command, TENOR_KEY))
 
 
 @bot.command()
@@ -107,12 +127,69 @@ async def haiku(ctx):
 async def flirt(ctx):
     """a cheesy pickup line :p"""
     await ctx.send(botfuncs.flirt(ctx.author.mention))
+
+
+@bot.command(aliases=["beat", "beattodeathwithhammer"])
+async def hammer(ctx, member: discord.Member=None):
+    """beats someone to death with a hammer"""
     
+    if not member:
+        member = ctx.author
+    await ctx.send(member.mention)
+    await ctx.send(botfuncs.hammer(TENOR_KEY))
+
+
+# NOT A FURRY!! this was a user request
 @bot.command()
-async def voice_test(ctx):
-    """DEBUG checks if bot is connected to a VC"""
-    voice = ctx.guild.voice_client
-    await ctx.send(f"{voice}\nin {voice.guild}, connected to channel {voice.channel}.\nis_connected: ***{voice.is_connected()}*** is_playing: ***{voice.is_playing()}***")
+async def fursona(ctx, member: discord.Member=None):
+    """generates a fursona for a member, you will get the same each time 😌"""
+    
+    if not member:
+        member = ctx.author
+    await ctx.send(f"{member.mention} your fursona is...\n**{botfuncs.fursona(member.id)}**")
+
+
+@bot.command()
+async def exile(ctx):
+    """bot leaves server if exiled by 10 different people within 10 secs"""
+    
+    server_index = 0
+    server_found = False
+    
+    for i in range(len(EXILE_COUNT)):
+        if EXILE_COUNT[i]["server"] == ctx.guild.name:
+            server_index = i
+            server_found = True
+            if EXILE_COUNT[i]["count"] == 9 and ctx.author.id not in EXILE_COUNT[i]["members"]:
+                await ctx.send("i have been exiled from this server, so it is now time for me to leave.\nsee u fuckers in hell")
+                print(f"exiled from server: {ctx.guild}")
+                await ctx.guild.leave()
+                return
+            else:
+                if ctx.author.id in EXILE_COUNT[i]["members"]:
+                    await ctx.send("you cannot cast your exile vote more than once within the 10 seconds!")
+                    return
+                else:
+                    EXILE_COUNT[i]["count"] += 1
+                    EXILE_COUNT[i]["members"].append(ctx.author.id)
+                    print(f"exile called in {ctx.guild}")
+                    print(EXILE_COUNT[server_index])
+                    await ctx.send(f"only {10 - EXILE_COUNT[i]["count"]} more votes needed to exile me!")
+                    break
+    
+    if not server_found:
+        EXILE_COUNT.append({"server": ctx.guild.name, "count": 1, "members": [ctx.author.id, ]})
+        server_index = len(EXILE_COUNT) - 1
+        print(f"exile called in {ctx.guild}")
+        print(EXILE_COUNT[server_index])
+        await ctx.send("only 9 more votes needed to exile me!")
+    
+    await asyncio.sleep(10)
+    EXILE_COUNT[server_index]["count"] = 0
+    EXILE_COUNT[server_index]["members"] = []
+    print(f"exile count for {ctx.guild} has been reset")
+    print(EXILE_COUNT[server_index])
+    await ctx.send("exile vote took too long! the counter has been reset to 0")
 
 
 @bot.command(description="this searches through every single message to find instances of the keyword argument from the given user, so it may take a while depending on how many messages have been sent in the server\nusage: juul count [word/\"multi-word phrase\"] @user")
@@ -131,6 +208,13 @@ async def count(ctx, kwarg: str = commands.parameter(description="keyword or \"m
                     counter += message.content.count(kwarg)
                     print(f"{ctx.guild}, {ctx.author.display_name}'s count command for \"{kwarg}\" is at: {counter}. From {timestamp}")
     await ctx.reply(f"{member.mention}, you have said \"{kwarg}\" **{counter}** times in this server")
+
+
+@bot.command()
+async def voice_test(ctx):
+    """DEBUG checks if bot is connected to a VC"""
+    voice = ctx.guild.voice_client
+    await ctx.send(f"{voice}\nin {voice.guild}, connected to channel {voice.channel}.\nis_connected: ***{voice.is_connected()}*** is_playing: ***{voice.is_playing()}***")
 
 
 # the following code for playing music is from the examples on the Discord.py GitHub
@@ -205,26 +289,20 @@ class Music(commands.Cog):
         await ctx.send(f'Now playing: {query}')
 
     @commands.command()
-    async def yt(self, ctx, *, url):
-        """Plays from a url (almost anything youtube_dl supports)"""
-
-        async with ctx.typing():
-            player = await YTDLSource.from_url(url, loop=self.bot.loop)
-            ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
-
-        await ctx.send(f'Now playing: {player.title}')
-
-    @commands.command()
-    async def stream(self, ctx, *, url):
-        """Streams from a url (same as yt, but doesn't predownload)"""
+    async def play(self, ctx, *, url=None):
+        """streams from a url"""
         
-        voice = ctx.guild.voice_client
+        if not url:
+            await ctx.send("you didn't provide something to play :(")
+            return
+        else:
+            voice = ctx.guild.voice_client
 
-        async with ctx.typing():
-            player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
-            voice.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
+            async with ctx.typing():
+                player = await YTDLSource.from_url(url, loop=self.bot.loop, stream=True)
+                voice.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
 
-        await ctx.send(f'Now playing: {player.title}')
+            await ctx.send(f'Now playing: {player.title}')
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -238,9 +316,19 @@ class Music(commands.Cog):
 
     @commands.command()
     async def stop(self, ctx):
-        """Stops and disconnects the bot from voice"""
+        """stops the bot's audio"""
+        
+        voice = ctx.guild.voice_client
 
-        await ctx.voice_client.disconnect()
+        voice.stop()
+        
+    @commands.command(aliases=["disconnect", "begone"])
+    async def leave(self, ctx):
+        """disconnects the bot from vc"""
+        
+        voice = ctx.guild.voice_client
+
+        await voice.disconnect()
 
     @play.before_invoke
     @yt.before_invoke
@@ -268,10 +356,7 @@ loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
 
 # planned feature/commands:
-# plays music with FFMPEG -- MAY NOT BE POSSIBLE?? DISCORD.PY MIGHT NEED UPDATE
-# leaves server if enough people use the command within a certain timeframe per Jae
-# removes images if it detects mustard tone per Mae
-# animal persona generator tied to Discord User ID so that it returns the same one each time per Mae
+# NONE :D
 #
 # implemeneted already:
 # dice roller per Ana -- DONE 2024-01-30
@@ -282,3 +367,7 @@ loop.run_until_complete(main())
 # haikus per Roshni -- DONE 2024-01-31
 # pickup lines per Emaan -- DONE 2024-01-31
 # returns how many times a user has said a given keyword per Carlos -- DONE 2024-02-03
+# plays music with FFMPEG -- MAY NOT BE POSSIBLE?? DISCORD.PY MIGHT NEED UPDATE -- WORKS NOW DONE 2024-02-08
+# animal persona generator tied to Discord User ID so that it returns the same one each time per Mae DONE 2024-13-02
+# removes images if it detects mustard tone per Mae WILL REQUIRE AI/ML FOR IMAGE RECOGNITION, OUTSIDE OF MY SCOPE OF KNOWLEDGE :( 
+# leaves server if enough people use the command within a certain timeframe per Jae

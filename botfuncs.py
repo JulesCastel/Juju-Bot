@@ -3,6 +3,15 @@ import requests
 import json
 
 
+def cnf_gif(fake_command, key) -> str:
+    while True:
+        try:
+            response = requests.get(f"https://tenor.googleapis.com/v2/search?q={fake_command}&key={key}&random=true&limit=1&media_filter=gif")
+        except requests.RequestException:
+            return "Tenor API failed :(\nsee: " + str(requests.RequestException)
+        if response.status_code == 200:
+            return response.json()["results"][0]["itemurl"]
+
 def hello(name: str) -> str:
     return f"hello there, {name}"
 
@@ -72,3 +81,19 @@ def flirt(name: str) -> str:
         return "pickup line API failed :(\nsee: " + str(requests.RequestException)
     line = response.json()["pickup"]
     return f"Hey {name},\n*{line}*\n😘"
+
+def hammer(key) -> str:
+    # putting this in a while loop bc for some reason, it won't accept my API key sometimes and i'll have to refresh to get it to work
+    while True:
+        try:
+            response = requests.get(f"https://tenor.googleapis.com/v2/search?q=hammer&key={key}&random=true&limit=1&media_filter=gif")
+        except requests.RequestException:
+            return "Tenor API failed :(\nsee: " + str(requests.RequestException)
+        if response.status_code == 200:
+            return response.json()["results"][0]["itemurl"]
+     
+def fursona(user_id: int) -> str:
+    with open("animals.txt") as file:
+        animals = file.read().split("\n")
+        random.seed(user_id)
+        return random.choice(animals)
