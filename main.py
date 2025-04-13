@@ -27,6 +27,7 @@ COMMAND_PREFIX: Final[str] = "juju " #change this to whatever you want
 load_dotenv()
 TOKEN: Final[str] = os.getenv("DISCORD_TOKEN")
 TENOR_KEY: Final[str] = os.getenv("TENOR_KEY")
+EXILE_COUNT = [{"server": None, "count": 0, "members": []}, ]
 
 
 # bot setup
