@@ -161,7 +161,7 @@ async def exile(ctx):
             server_index = i
             server_found = True
             if EXILE_COUNT[i]["count"] == 9 and ctx.author.id not in EXILE_COUNT[i]["members"]:
-                await ctx.send("i have been exiled from this server, so it is now time for me to leave.\nsee u fuckers in hell")
+                await ctx.send("i have been exiled from this server, so it is now time for me to leave.")
                 print(f"exiled from server: {ctx.guild}")
                 await ctx.guild.leave()
                 return
